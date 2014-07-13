@@ -32,6 +32,7 @@ sub findBauhnOnInterface($$)
 
     my $socket = IO::Socket::INET->new(Proto=>'udp', LocalPort=>$port, Broadcast=>1) ||
                      die "Could not create listen socket: $!\n";
+    $socket->autoflush();
     my $select = IO::Select->new($socket) ||
                      die "Could not create Select: $!\n";
 
@@ -40,7 +41,7 @@ sub findBauhnOnInterface($$)
         die "Send error: $!\n";
 
     my $n = 0;
-    while($n < 2) {
+    while($n < 3) {
         my @ready = $select->can_read(0.5);
         foreach my $fh (@ready) {
             my $packet;
@@ -68,10 +69,12 @@ sub findBauhn($)
     my @interfaces = IO::Interface::Simple->interfaces;
     @interfaces = grep(!/^lo$/, @interfaces);
     
-    for my $if (@interfaces) {
-        my $bauhn = findBauhnOnInterface($mac, $if);
-        if (defined($bauhn)) {
-            return $bauhn;
+    for(my $n=0; $n<2; $n++) {
+        for my $if (@interfaces) {
+            my $bauhn = findBauhnOnInterface($mac, $if);
+            if (defined($bauhn)) {
+                return $bauhn;
+            }
         }
     }
     return undef;
@@ -124,9 +127,21 @@ my @mac = split(':', $ARGV[0]);
 @mac = map { hex("0x".$_) } split(':', $ARGV[0]);
 my $mac = pack('C*', @mac);
 
+
 my $bauhn = findBauhn($mac);
 defined($bauhn) || die "Could not find Bauhn with mac of $ARGV[0]\n";
-controlBauhn($bauhn, $ARGV[1]) || "Could not turn Bauhn $ARGV[1]\n";
+if ($ARGV[1] eq "status") {
+    print $bauhn->{on} ? "on\n" : "off\n";
+    exit(0);
+}
+($ARGV[1] ne "on" && $ARGV[1] ne "off") && die "Usage: $0 XX:XX:XX:XX:XX:XX <on|off|status>\n";
+
+for(my $n=0; $n<3; $n++) {
+    controlBauhn($bauhn, $ARGV[1]) && exit(0);
+}
+die "Could not change Bauhn to $ARGV[1]\n";
+
+
 
 
 
