@@ -9,7 +9,6 @@
 use strict;
 use IO::Socket;
 use IO::Select;
-use IO::Interface::Simple;
 use Data::Dumper;
 
 my $port = 10000;
@@ -22,9 +21,9 @@ my $twenties     = pack('C*', (0x20,0x20,0x20,0x20,0x20,0x20));
 my $onoff        = pack('C*', (0x68,0x64,0x00,0x17,0x73,0x66));
 my $subscribed   = pack('C*', (0x68,0x64,0x00,0x18,0x63,0x6c));
 
-sub findBauhnOnInterface($$)
+sub findBauhn($)
 {
-    my ($mac,$if) = @_;
+    my ($mac) = @_;
 
     my $bauhn;
     my $reversed_mac = scalar(reverse($mac));
@@ -36,7 +35,7 @@ sub findBauhnOnInterface($$)
     my $select = IO::Select->new($socket) ||
                      die "Could not create Select: $!\n";
 
-    my $to_addr = sockaddr_in($port, inet_aton($if->broadcast));
+    my $to_addr = sockaddr_in($port, INADDR_BROADCAST);
     $socket->send($subscribe, 0, $to_addr) ||
         die "Send error: $!\n";
 
@@ -60,26 +59,6 @@ sub findBauhnOnInterface($$)
     close($socket);
     return undef;
 }
-
-sub findBauhn($)
-{
-    my ($mac) = @_;
-
-
-    my @interfaces = IO::Interface::Simple->interfaces;
-    @interfaces = grep(!/^lo$/, @interfaces);
-    
-    for(my $n=0; $n<2; $n++) {
-        for my $if (@interfaces) {
-            my $bauhn = findBauhnOnInterface($mac, $if);
-            if (defined($bauhn)) {
-                return $bauhn;
-            }
-        }
-    }
-    return undef;
-}
-
 
 sub controlBauhn($$)
 {
